@@ -1,7 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from datetime import datetime
+
+import schedule
+import time
+import threading
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tasks.db'  # Using SQLite Database
@@ -18,8 +22,24 @@ class Task(db.Model):
   due_date = db.Column(db.DateTime, nullable=False)
   status = db.Column(db.String(50), nullable=False)
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
+  # Searching or filtering feature
+  query = Task.query
+  # If searching or filter, then using the conditions
+  if request.method == 'POST':
+    title = request.form.get('title')
+    priority = request.form.get('priority')
+    status = request.form.get('status')
+    # Searching and filter conditions
+    if title:
+      query = query.filter(Task.title.contains(title))
+    if priority:
+      query = query.filter(Task.priority == priority)
+    if status:
+      query = query.filter(Task.status == status)
+  # Searching or filtering feature
+
   tasks = Task.query.order_by(Task.due_date).all()
   return render_template('index.html', tasks=tasks)
 
@@ -57,5 +77,37 @@ def delete_task(id):
   db.session.commit()
   return redirect(url_for('index'))
 
+def check_due_tasks():
+  tasks = Task.query.filter(Task.due_date <= datetime.now(), Task.status == 'Pending').all()
+  for task in tasks:
+    print(f"Reminder: Task '{task.title}' is due soon!")
+
+# Checking in every one minute
+schedule.every(1).minutes.do(check_due_tasks)
+
+# Run minder in back-end
+def run_scheduler():
+  while True:
+    schedule.run_pending()
+    time.sleep(1)
+
+@app.route('/get_tasks', methods=['GET'])
+def get_tasks():
+  tasks = Task.query.all()
+  events = []
+  for task in tasks:
+    events.append({
+      'title': task.title,
+      'start': task.due_date.strftime('%Y-%m-%d'),  # The deadline of the task
+      'description': task.description,  # Shows extra messages on the calendar
+      'status': task.status,
+    })
+  return jsonify(events)
+
 if __name__ == '__main__':
+  # Starts the threading of Scheduler
+  scheduler_thread = threading.Thread(target=run_scheduler)
+  scheduler_thread.daemon = True  # The threading ends automatically after the main thread ends
+  scheduler_thread.start()
+
   app.run(debug=True)

@@ -27,11 +27,39 @@
     th {
       background-color: #f2f2f2;
     }
+
+    #calendar {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 10px;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      height: 700px;  /* Ensure the height for the container of the calendar */
+    }
   </style>
+  <!-- FullCalendar CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.css" rel="stylesheet" />
 </head>
 <body>
   <h1>Task Manager</h1>
   <a href="/create">Create New Task</a>
+
+  <form action="{{ url_for('index') }}" method="POST">
+    <input type="text" name="title" placeholder="Search by title">
+    <select name="priority">
+      <option value="">Filter by priority</option>
+      <option value="Low">Low</option>
+      <option value="Medium">Medium</option>
+      <option value="High">High</option>
+    </select>
+    <select name="status">
+      <option value="">Filter by status</option>
+      <option value="Pending">Pending</option>
+      <option value="Completed">Completed</option>
+    </select>
+    <button type="submit">Search/Filter</button>
+  </form>
+
   <h2>Your Tasks</h2>
   <table>
     <thead>
@@ -45,7 +73,11 @@
     </thead>
     <tbody>
       {% for task in tasks %}
-      <tr>
+      <tr style="background-color: 
+          {% if task.priority == 'High' %}#ff9999
+          {% elif task.priority == 'Medium' %}#ffff99
+          {% else %}#99ff99
+          {% endif %};">
         <td>{{ task.title }}</td>
         <td>{{ task.description }}</td>
         <td>{{ task.priority }}</td>
@@ -61,5 +93,23 @@
       {% endfor %}
     </tbody>
   </table>
+
+  <div id="calendar"></div>
+
+  <!-- FullCalendar JS -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var calendarEl = document.getElementById('calendar');
+      var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth', // Starts with monthly view
+        events: '/get_tasks', // The event from the back-end API
+        eventClick: function(info) {
+          alert('Title: ' + info.event.title + '\nDescription: ' + info.event.extendedProps.description);
+        }
+      });
+      calendar.render();
+    });
+  </script>
 </body>
 </html>
